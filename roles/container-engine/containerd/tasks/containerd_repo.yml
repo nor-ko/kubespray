@@ -43,13 +43,13 @@
   template:
     src: "rh_containerd.repo.j2"
     dest: "{{ yum_repo_dir }}/containerd.repo"
-  when: ansible_distribution in ["CentOS","RedHat"]
+  when: ansible_distribution in ["CentOS","RedHat","OracleLinux"]
 
 - name: check if container-selinux is available
   yum:
     list: "container-selinux"
   register: yum_result
-  when: ansible_distribution in ["CentOS","RedHat"]
+  when: ansible_distribution in ["CentOS","RedHat","OracleLinux"]
 
 - name: Configure extras repository on RedHat/CentOS if container-selinux is not available in current repos
   yum_repository:
@@ -66,12 +66,27 @@
     - ansible_distribution in ["CentOS","RedHat"]
     - yum_result.results | length == 0
 
+- name: Configure developer repository on OracleLinux if container-selinux is not available in current repos
+  yum_repository:
+    name: ol7_developer
+    description: "OL7 - developer"
+    state: present
+    baseurl: "{{ developer_ol_repo_base_url }}"
+    file: "ol7_developer"
+    gpgcheck: "{{ 'yes' if developer_ol_repo_gpgkey else 'no' }}"
+    gpgkey: "{{ developer_ol_repo_gpgkey }}"
+    keepcache: "{{ containerd_rpm_keepcache | default('1') }}"
+    proxy: " {{ http_proxy | default('_none_') }}"
+  when:
+    - ansible_distribution in ["OracleLinux"]
+    - yum_result.results | length == 0
+  
 - name: Copy yum.conf for editing
   copy:
     src: "{{ yum_conf }}"
     dest: "{{ containerd_yum_conf }}"
     remote_src: yes
-  when: ansible_distribution in ["CentOS","RedHat"]
+  when: ansible_distribution in ["CentOS","RedHat","OracleLinux"]
 
 - name: Edit copy of yum.conf to set obsoletes=0
   lineinfile:
@@ -79,4 +94,4 @@
     state: present
     regexp: '^obsoletes='
     line: 'obsoletes=0'
-  when: ansible_distribution in ["CentOS","RedHat"]
+  when: ansible_distribution in ["CentOS","RedHat", "OracleLinux"]
